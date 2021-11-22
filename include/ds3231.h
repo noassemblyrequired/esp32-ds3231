@@ -119,7 +119,8 @@ typedef enum __attribute__((__packed__))
   DS3231_SquareWave_1Hz       = 0x00, //!< Output 1Hz square wave
   DS3231_SquareWave_1p024kHz  = 0x01, //!< Output 1.024kHz square wave
   DS3231_SquareWave_4p096kHz  = 0x02, //!< Output 4.096kHz square wave
-  DS3231_SquareWave_8p192kHz  = 0x03  //!< Output 8.192kHz square wave
+  DS3231_SquareWave_8p192kHz  = 0x03, //!< Output 8.192kHz square wave
+  DS3231_SquareWave_Off       = 0xFF  //!< Disable square wave generation
 } DS3231_SquareWave_t;
 
 /**
@@ -327,7 +328,8 @@ esp_err_t ds3231_clear_intr_flag(DS3231_Cfg_t cfg, DS3231_Interrupt_t intr_flag,
 esp_err_t ds3231_get_intr_flag(DS3231_Cfg_t cfg, DS3231_Interrupt_t* intr_flag, TickType_t timeout);
 
 /**
- * @brief Set which alarm interrupts are enabled/disabled.
+ * @brief Set which alarm interrupts are enabled/disabled. If alarm interrupts are disabled then the interrupt control
+ * bit is de-asserted.
  * 
  * @param cfg The configuration of the DS3231 component.
  * @param intr_flag Enable or disable alarm interrupts.

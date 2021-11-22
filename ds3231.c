@@ -3,17 +3,11 @@
 
 #define DS3231_ADDR     0x68
 #define DS3231_CAL_REG  0x00
-#define DS3231_CAL_SZ   0x07
 #define DS3231_ALM1_REG 0x07
-#define DS3231_ALM1_SZ  0x04
 #define DS3231_ALM2_REG 0x0B
-#define DS3231_ALM2_SZ  0x03
 #define DS3231_CTRL_REG 0x0E
-#define DS3231_CTRL_SZ  0x01
 #define DS3231_CS_REG   0x0F
-#define DS3231_CS_SZ    0x01
 #define DS3231_AGE_REG  0x10
-#define DS3231_AGE_SZ   0x01
 #define DS3231_TEMP_REG 0x11
 
 struct DS3231_Cfg
@@ -21,7 +15,7 @@ struct DS3231_Cfg
   i2c_port_t i2c_port;
 };
 
-typedef struct
+typedef struct _internal_ds3231_calendar_s
 {
   uint8_t seconds_1s  : 4;
   uint8_t seconds_10s : 3;
@@ -53,7 +47,7 @@ typedef struct
   uint8_t year_10s    : 4;
 } __attribute__((packed)) Internal_DS3231_Calendar_t;
 
-typedef struct
+typedef struct _internal_ds3231_alarm1_s
 {
   uint8_t seconds_1s  : 4;
   uint8_t seconds_10s : 3;
@@ -65,8 +59,8 @@ typedef struct
 
   uint8_t hour_1s      : 4;
   uint8_t hour_10s     : 1;
-  uint8_t am_pm_hour_20 : 1;
-  uint8_t mode_12_24h   : 1;
+  uint8_t am_pm_hour_20 : 1; // if mode_12_24h == 1, then AM/PM, else 20 hour
+  uint8_t mode_12_24h   : 1; // if 0 -> 24h clock, 1 -> 12h clock
   uint8_t a1m3          : 1;
 
   uint8_t day_1s                : 4;
@@ -75,7 +69,7 @@ typedef struct
   uint8_t a1m4                  : 1;
 } Internal_DS3231_Alarm1_t;
 
-typedef struct
+typedef struct _internal_ds3231_alarm2_s
 {
   uint8_t minutes_1s  : 4;
   uint8_t minutes_10s : 3;
@@ -93,7 +87,7 @@ typedef struct
   uint8_t a2m4                  : 1;
 } Internal_DS3231_Alarm2_t;
 
-typedef struct
+typedef struct _internal_ds3231_control_s
 {
   uint8_t alarm1_intr_en  : 1;
   uint8_t alarm2_intr_en  : 1;
@@ -104,7 +98,7 @@ typedef struct
   uint8_t osc_en_n        : 1;
 } Internal_DS3231_Control_t;
 
-typedef struct 
+typedef struct _internal_ds3231_ctrlstat_s
 {
   uint8_t a1f     : 1;
   uint8_t a2f     : 1;
@@ -112,7 +106,7 @@ typedef struct
   uint8_t en32kHz : 1;
   uint8_t         : 3;
   uint8_t osf     : 1;
-} Internal_DS3231_CntlStat;
+} Internal_DS3231_CtrlStat_t;
 
 static void ds3231_convert_ext_calendar(DS3231_Calendar_t* in, Internal_DS3231_Calendar_t* out);
 static void ds3231_convert_int_calendar(DS3231_Calendar_t* out, Internal_DS3231_Calendar_t* in);
@@ -123,32 +117,31 @@ static esp_err_t ds3231_get_alarm2(DS3231_Cfg_t cfg, DS3231_AlarmSetting_t* alar
 static esp_err_t ds3231_set_alarm1(DS3231_Cfg_t cfg, DS3231_AlarmSetting_t* alarm, TickType_t timeout);
 static esp_err_t ds3231_set_alarm2(DS3231_Cfg_t cfg, DS3231_AlarmSetting_t* alarm, TickType_t timeout);
 
-static inline esp_err_t ds3231_get_ctrl(DS3231_Cfg_t cfg, uint8_t* ctrl, TickType_t timeout)
+static inline esp_err_t ds3231_get_ctrl(DS3231_Cfg_t cfg, Internal_DS3231_Control_t* ctrl, TickType_t timeout)
 {
-  return ds3231_i2c_read(cfg, DS3231_CTRL_REG, ctrl, sizeof(*ctrl), timeout);
+  return ds3231_i2c_read(cfg, DS3231_CTRL_REG, (uint8_t*)ctrl, sizeof(*ctrl), timeout);
 }
 
-static inline esp_err_t ds3231_set_ctrl(DS3231_Cfg_t cfg, uint8_t ctrl, TickType_t timeout)
+static inline esp_err_t ds3231_set_ctrl(DS3231_Cfg_t cfg, Internal_DS3231_Control_t* ctrl, TickType_t timeout)
 {
-  return ds3231_i2c_write(cfg, DS3231_CTRL_REG, &ctrl, sizeof(ctrl), timeout);
+  return ds3231_i2c_write(cfg, DS3231_CTRL_REG, (uint8_t*)ctrl, sizeof(*ctrl), timeout);
 }
 
-static inline esp_err_t ds3231_get_cs(DS3231_Cfg_t cfg, uint8_t* ctrl_status, TickType_t timeout)
+static inline esp_err_t ds3231_get_cs(DS3231_Cfg_t cfg, Internal_DS3231_CtrlStat_t* ctrl_status, TickType_t timeout)
 {
-  return ds3231_i2c_read(cfg, DS3231_CS_REG, ctrl_status, sizeof(*ctrl_status), timeout);
+  return ds3231_i2c_read(cfg, DS3231_CS_REG, (uint8_t*)ctrl_status, sizeof(*ctrl_status), timeout);
 }
 
-static inline esp_err_t ds3231_set_cs(DS3231_Cfg_t cfg, uint8_t ctrl_status, TickType_t timeout)
+static inline esp_err_t ds3231_set_cs(DS3231_Cfg_t cfg, Internal_DS3231_CtrlStat_t* ctrl_status, TickType_t timeout)
 {
-  return ds3231_i2c_write(cfg, DS3231_CS_REG, &ctrl_status, sizeof(ctrl_status), timeout);
+  return ds3231_i2c_write(cfg, DS3231_CS_REG, (uint8_t*)ctrl_status, sizeof(*ctrl_status), timeout);
 }
 
 DS3231_Cfg_t ds3231_create(i2c_port_t i2c_port)
 {
   DS3231_Cfg_t cfg = (DS3231_Cfg_t)malloc(sizeof(*cfg));
-  if (!cfg)
-    return NULL;
-  cfg->i2c_port = i2c_port;
+  if (cfg)
+    cfg->i2c_port = i2c_port;
 
   return cfg;
 }
@@ -178,9 +171,13 @@ esp_err_t ds3231_get_temperature(DS3231_Cfg_t cfg, float* temperature, TickType_
   {
     uint16_t temp = (temp_data[0] << 2) | (temp_data[1] >> 6);
     if (temp & 0x200)
-      temp |= 0xFE00;
+    {
+      // if the 10th bit (sign bit) is asserted then assert bits 11-15
+      // this will convert to proper, negative int16_t value.
+      temp |= 0xFC00;
+    }
 
-    *temperature = (int16_t)temp * 0.25;
+    *temperature = (int16_t)temp * 0.25f;
   }
 
   return res;
@@ -206,192 +203,182 @@ esp_err_t ds3231_set_alarm(DS3231_Cfg_t cfg, DS3231_AlarmSetting_t* alarm, TickT
     return ESP_ERR_INVALID_ARG;
 }
 
+esp_err_t ds3231_get_intr_en(DS3231_Cfg_t cfg, DS3231_Interrupt_t* intr_flag, TickType_t timeout)
+{
+  Internal_DS3231_Control_t ctrl;
+  esp_err_t res = ds3231_get_ctrl(cfg, &ctrl, timeout);
+  if (res == ESP_OK)
+  {
+    *intr_flag = DS3231_Interrupt_None;
+    *intr_flag |= ctrl.alarm1_intr_en ? DS3231_Interrupt_Alarm_1 : 0;
+    *intr_flag |= ctrl.alarm2_intr_en ? DS3231_Interrupt_Alarm_2 : 0;
+  }
+
+  return res;
+}
+
 esp_err_t ds3231_set_intr_en(DS3231_Cfg_t cfg, DS3231_Interrupt_t intr_flags, TickType_t timeout)
 {
-  uint8_t ctrl;
-  esp_err_t res = ds3231_i2c_read(cfg, DS3231_CTRL_REG, &ctrl, sizeof(ctrl), timeout);
-  if (res != ESP_OK)
-    return res;
+  Internal_DS3231_Control_t ctrl;
+  esp_err_t res = ds3231_get_ctrl(cfg, &ctrl,timeout);
+  if (res == ESP_OK)
+  {
+    ctrl.intr_control = intr_flags != 0;
+    ctrl.alarm1_intr_en = (intr_flags & DS3231_Interrupt_Alarm_1) == DS3231_Interrupt_Alarm_1;
+    ctrl.alarm2_intr_en = (intr_flags & DS3231_Interrupt_Alarm_2) == DS3231_Interrupt_Alarm_2;
+  }
 
-  ctrl &= 0xFC;
-  ctrl |= (intr_flags & DS3231_Interrupt_Alarm_1);
-  ctrl |= (intr_flags & DS3231_Interrupt_Alarm_2);
-
-  return ds3231_i2c_write(cfg, DS3231_CTRL_REG, &ctrl, sizeof(ctrl), timeout);
+  return ds3231_set_ctrl(cfg, &ctrl, timeout);
 }
 
 esp_err_t ds3231_set_square_wave(DS3231_Cfg_t cfg, DS3231_SquareWave_t sqw, TickType_t timeout)
 {
-  uint8_t ctrl;
+  Internal_DS3231_Control_t ctrl;
   esp_err_t res = ds3231_get_ctrl(cfg, &ctrl, timeout);
   if (res != ESP_OK)
     return res;
 
-#define CTRL_SQW_BIT_POS  3
-#define CTRL_SQW_MASK     0xE7
+  if (sqw == DS3231_SquareWave_Off)
+  {
+    ctrl.bbsqw = 0;
+  }
+  else
+  {
+    ctrl.rs = sqw;
+    ctrl.bbsqw = 1;
+  }
 
-  sqw <<= CTRL_SQW_BIT_POS;
-  sqw &= ~CTRL_SQW_MASK;
-  ctrl &= CTRL_SQW_MASK;
-  ctrl |= sqw;
-  return ds3231_set_ctrl(cfg, ctrl, timeout);
+  return ds3231_set_ctrl(cfg, &ctrl, timeout);
 }
 
-#define CTRL_CONV_BIT_POS 5
-#define CTRL_CONV_BIT     (1 << (CTRL_CONV_BIT_POS))
+esp_err_t ds3231_get_square_wave(DS3231_Cfg_t cfg, DS3231_SquareWave_t* square_wave_setting, TickType_t timeout)
+{
+  Internal_DS3231_Control_t ctrl;
+  esp_err_t res = ds3231_get_ctrl(cfg, &ctrl, timeout);
+  if (res == ESP_OK)
+    *square_wave_setting = ctrl.bbsqw ? ctrl.rs : DS3231_SquareWave_Off;
+
+  return ESP_OK;
+}
 
 esp_err_t ds3231_set_convert_temperature(DS3231_Cfg_t cfg, TickType_t timeout)
 {
-  uint8_t ctrl;
+  Internal_DS3231_Control_t ctrl;
   esp_err_t res = ds3231_get_ctrl(cfg, &ctrl, timeout);
   if (res != ESP_OK)
     return res;
 
-  ctrl |= CTRL_CONV_BIT;
-  return ds3231_set_ctrl(cfg, ctrl, timeout);
+  ctrl.conv = 1;
+  return ds3231_set_ctrl(cfg, &ctrl, timeout);
 }
 
 esp_err_t ds3231_get_convert_temperature(DS3231_Cfg_t cfg, uint8_t* conv, TickType_t timeout)
 {
-  uint8_t ctrl;
+  Internal_DS3231_Control_t ctrl;
   esp_err_t res = ds3231_get_ctrl(cfg, &ctrl, timeout);
   if (res == ESP_OK)
-    *conv = (ctrl & CTRL_CONV_BIT) == CTRL_CONV_BIT;
+    *conv = ctrl.conv;
   return res;
 }
 
-#define CTRL_EOSC_BIT_POS 7
-#define CTRL_EOSC_MASK    0x7F
-
 esp_err_t ds3231_get_osc(DS3231_Cfg_t cfg, DS3231_Oscillator_t* eosc, TickType_t timeout)
 {
-  uint8_t ctrl;
+  Internal_DS3231_Control_t ctrl;
   esp_err_t res = ds3231_get_ctrl(cfg, &ctrl, timeout);
   if (res != ESP_OK)
     return res;
 
-  *eosc = (ctrl & ~(CTRL_EOSC_MASK)) >> CTRL_EOSC_BIT_POS;
+  *eosc = ctrl.osc_en_n;
   return ESP_OK;
 }
 
 esp_err_t ds3231_set_osc(DS3231_Cfg_t cfg, DS3231_Oscillator_t eosc, TickType_t timeout)
 {
-  uint8_t ctrl;
+  Internal_DS3231_Control_t ctrl;
   esp_err_t res = ds3231_get_ctrl(cfg, &ctrl, timeout);
   if (res != ESP_OK)
     return res;
 
-  ctrl &= CTRL_EOSC_MASK;
-  ctrl |= (eosc & 1) << CTRL_EOSC_BIT_POS;
-  return ds3231_set_ctrl(cfg, ctrl, timeout);
+  ctrl.osc_en_n = eosc;
+  return ds3231_set_ctrl(cfg, &ctrl, timeout);
 }
-
-#define CS_EN32kHz_BIT_POS 3
-#define CS_EN32kHz_MASK    0xF7
 
 esp_err_t ds3231_get_32kHz(DS3231_Cfg_t cfg, DS3231_32kHz_t* en32kHz, TickType_t timeout)
 {
-  uint8_t cs;
+  Internal_DS3231_CtrlStat_t cs;
   esp_err_t res = ds3231_get_cs(cfg, &cs, timeout);
-  if (res != ESP_OK)
-    return res;
-
-  *en32kHz = (cs & ~CS_EN32kHz_MASK) >> CS_EN32kHz_BIT_POS;
-  return ESP_OK;
+  if (res == ESP_OK)
+    *en32kHz = cs.en32kHz;
+  return res; 
 }
 
 esp_err_t ds3231_set_32kHz(DS3231_Cfg_t cfg, DS3231_32kHz_t en32kHz, TickType_t timeout)
 {
-  uint8_t cs;
+  Internal_DS3231_CtrlStat_t cs;
   esp_err_t res = ds3231_get_cs(cfg, &cs, timeout);
   if (res != ESP_OK)
     return res;
 
-  en32kHz <<= CS_EN32kHz_BIT_POS;
-  en32kHz &= ~CS_EN32kHz_MASK;
-  cs &= CS_EN32kHz_MASK;
-  cs |= en32kHz;
-  return ds3231_set_cs(cfg, cs, timeout);
+  cs.en32kHz = en32kHz;
+  return ds3231_set_cs(cfg, &cs, timeout);
 }
-
-#define CS_BSY_BIT_POS 2
-#define CS_BSY_MASK    0xFB
 
 esp_err_t ds3231_is_busy(DS3231_Cfg_t cfg, uint8_t* busy, TickType_t timeout)
 {
-  uint8_t cs;
+  Internal_DS3231_CtrlStat_t cs;
   esp_err_t res = ds3231_get_cs(cfg, &cs, timeout);
-  if (res != ESP_OK)
-    return res;
-
-  *busy = (cs & ~CS_BSY_MASK) >> CS_BSY_BIT_POS;
-  return ESP_OK;
+  if (res == ESP_OK)
+    *busy = cs.bsy;
+  return res;
 }
-
-#define CS_OSF_BIT_POS 7
-#define CS_OSF_MASK    0x7F
 
 esp_err_t ds3231_get_osc_stop_flag(DS3231_Cfg_t cfg, uint8_t* osc_stop_flag, TickType_t timeout)
 {
-  uint8_t cs;
+  Internal_DS3231_CtrlStat_t cs;
   esp_err_t res = ds3231_get_cs(cfg, &cs, timeout);
   if (res != ESP_OK)
     return res;
 
-  *osc_stop_flag = (cs & ~CS_OSF_MASK) >> CS_OSF_BIT_POS;
+  *osc_stop_flag = cs.osf;
   return ESP_OK;
 }
 
 esp_err_t ds3231_clear_osc_stop_flag(DS3231_Cfg_t cfg, TickType_t timeout)
 {
-  uint8_t cs;
+  Internal_DS3231_CtrlStat_t cs;
   esp_err_t res = ds3231_get_cs(cfg, &cs, timeout);
   if (res != ESP_OK)
     return res;
 
-  cs &= CS_OSF_MASK;
-  return ds3231_set_cs(cfg, cs, timeout);
-}
-
-esp_err_t ds3231_get_intr_en(DS3231_Cfg_t cfg, DS3231_Interrupt_t* intr_flag, TickType_t timeout)
-{
-  uint8_t ctrl;
-  esp_err_t res = ds3231_get_ctrl(cfg, &ctrl, timeout);
-  if (res == ESP_OK)
-  {
-    *intr_flag = DS3231_Interrupt_None;
-    *intr_flag |= (ctrl & DS3231_Interrupt_Alarm_1);
-    *intr_flag |= (ctrl & DS3231_Interrupt_Alarm_2);
-  }
-
-  return ESP_OK;
+  cs.osf = 0;
+  return ds3231_set_cs(cfg, &cs, timeout);
 }
 
 esp_err_t ds3231_get_intr_flag(DS3231_Cfg_t cfg, DS3231_Interrupt_t* intr_flag, TickType_t timeout)
 {
-  uint8_t ctrl_status;
+  Internal_DS3231_CtrlStat_t ctrl_status;
   int res = ds3231_get_cs(cfg, &ctrl_status, timeout);
   if (res == ESP_OK)
   {
     *intr_flag = DS3231_Interrupt_None;
-    *intr_flag |= (ctrl_status & DS3231_Interrupt_Alarm_1);
-    *intr_flag |= (ctrl_status & DS3231_Interrupt_Alarm_1);
+    *intr_flag |= ctrl_status.a1f ? DS3231_Interrupt_Alarm_1 : 0;
+    *intr_flag |= ctrl_status.a1f ? DS3231_Interrupt_Alarm_2 : 0;
   }
-  return ESP_OK;
+
+  return res;
 }
 
 esp_err_t ds3231_clear_intr_flag(DS3231_Cfg_t cfg, DS3231_Interrupt_t intr_flags, TickType_t timeout)
 {
-  uint8_t ctrl_status;
+  Internal_DS3231_CtrlStat_t ctrl_status;
   esp_err_t res = ds3231_get_cs(cfg, &ctrl_status, timeout);
-  if (res != ESP_OK)
+  if (res == ESP_OK)
     return res;
 
-  ctrl_status &= 0xFC;
-  ctrl_status |= (intr_flags & DS3231_Interrupt_Alarm_1);
-  ctrl_status |= (intr_flags & DS3231_Interrupt_Alarm_2);
+  ctrl_status.a1f = (intr_flags & DS3231_Interrupt_Alarm_1) == DS3231_Interrupt_Alarm_1;
+  ctrl_status.a2f = (intr_flags & DS3231_Interrupt_Alarm_2) == DS3231_Interrupt_Alarm_2;
 
-  return ds3231_set_cs(cfg, ctrl_status, timeout);
+  return ds3231_set_cs(cfg, &ctrl_status, timeout);
 }
 
 esp_err_t ds3231_get_aging_offset(DS3231_Cfg_t cfg, uint8_t* aging_offset, TickType_t timeout)
