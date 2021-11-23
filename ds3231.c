@@ -64,10 +64,10 @@ typedef struct _internal_ds3231_alarm1_s
   uint8_t a1m3          : 1;
 
   uint8_t day_1s                : 4;
-  uint8_t day_10s               : 3;
+  uint8_t day_10s               : 2;
   uint8_t day_of_week_or_month  : 1;
   uint8_t a1m4                  : 1;
-} Internal_DS3231_Alarm1_t;
+} __attribute__((packed)) Internal_DS3231_Alarm1_t;
 
 typedef struct _internal_ds3231_alarm2_s
 {
@@ -75,17 +75,17 @@ typedef struct _internal_ds3231_alarm2_s
   uint8_t minutes_10s : 3;
   uint8_t a2m2        : 1;
 
-  uint8_t hours_1s      : 4;
-  uint8_t hours_10s     : 1;
+  uint8_t hour_1s      : 4;
+  uint8_t hour_10s     : 1;
   uint8_t am_pm_hour_20 : 1;
   uint8_t mode_12_24h   : 1;
   uint8_t a2m3          : 1;
 
   uint8_t day_1s                : 4;
-  uint8_t day_10s               : 3;
+  uint8_t day_10s               : 2;
   uint8_t day_of_week_or_month  : 1;
   uint8_t a2m4                  : 1;
-} Internal_DS3231_Alarm2_t;
+} __attribute__((packed)) Internal_DS3231_Alarm2_t;
 
 typedef struct _internal_ds3231_control_s
 {
@@ -96,7 +96,7 @@ typedef struct _internal_ds3231_control_s
   uint8_t conv            : 1;
   uint8_t bbsqw           : 1;
   uint8_t osc_en_n        : 1;
-} Internal_DS3231_Control_t;
+} __attribute__((packed)) Internal_DS3231_Control_t;
 
 typedef struct _internal_ds3231_ctrlstat_s
 {
@@ -106,7 +106,7 @@ typedef struct _internal_ds3231_ctrlstat_s
   uint8_t en32kHz : 1;
   uint8_t         : 3;
   uint8_t osf     : 1;
-} Internal_DS3231_CtrlStat_t;
+} __attribute__((__packed__)) Internal_DS3231_CtrlStat_t;
 
 static void ds3231_convert_ext_calendar(DS3231_Calendar_t* in, Internal_DS3231_Calendar_t* out);
 static void ds3231_convert_int_calendar(DS3231_Calendar_t* out, Internal_DS3231_Calendar_t* in);
@@ -362,7 +362,7 @@ esp_err_t ds3231_get_intr_flag(DS3231_Cfg_t cfg, DS3231_Interrupt_t* intr_flag, 
   {
     *intr_flag = DS3231_Interrupt_None;
     *intr_flag |= ctrl_status.a1f ? DS3231_Interrupt_Alarm_1 : 0;
-    *intr_flag |= ctrl_status.a1f ? DS3231_Interrupt_Alarm_2 : 0;
+    *intr_flag |= ctrl_status.a2f ? DS3231_Interrupt_Alarm_2 : 0;
   }
 
   return res;
@@ -372,11 +372,11 @@ esp_err_t ds3231_clear_intr_flag(DS3231_Cfg_t cfg, DS3231_Interrupt_t intr_flags
 {
   Internal_DS3231_CtrlStat_t ctrl_status;
   esp_err_t res = ds3231_get_cs(cfg, &ctrl_status, timeout);
-  if (res == ESP_OK)
+  if (res != ESP_OK)
     return res;
 
-  ctrl_status.a1f = (intr_flags & DS3231_Interrupt_Alarm_1) == DS3231_Interrupt_Alarm_1;
-  ctrl_status.a2f = (intr_flags & DS3231_Interrupt_Alarm_2) == DS3231_Interrupt_Alarm_2;
+  ctrl_status.a1f = (intr_flags & DS3231_Interrupt_Alarm_1) == DS3231_Interrupt_Alarm_1 ? 0 : ctrl_status.a1f;
+  ctrl_status.a2f = (intr_flags & DS3231_Interrupt_Alarm_2) == DS3231_Interrupt_Alarm_2 ? 0 : ctrl_status.a2f;
 
   return ds3231_set_cs(cfg, &ctrl_status, timeout);
 }
@@ -543,12 +543,12 @@ static esp_err_t ds3231_get_alarm2(DS3231_Cfg_t cfg, DS3231_AlarmSetting_t* alar
     {
       alarm->clock_type = DS3231_ClockType_12_Hour;
       alarm->am_pm = alarm2.am_pm_hour_20 ? DS3231_PM : DS3231_AM;
-      alarm->hour = alarm2.hours_10s * 10 + alarm2.hours_1s;
+      alarm->hour = alarm2.hour_10s * 10 + alarm2.hour_1s;
     }
     else
     {
       alarm->clock_type = DS3231_ClockType_24_Hour;
-      alarm->hour = alarm2.am_pm_hour_20 * 20 + alarm2.hours_10s * 10 + alarm2.hours_1s;
+      alarm->hour = alarm2.am_pm_hour_20 * 20 + alarm2.hour_10s * 10 + alarm2.hour_1s;
     }
 
     alarm->day = alarm2.day_10s * 10 + alarm2.day_1s;
@@ -591,6 +591,10 @@ static esp_err_t ds3231_set_alarm1(DS3231_Cfg_t cfg, DS3231_AlarmSetting_t* alar
       alarm1.am_pm_hour_20 = 0;
       alarm1.hour_10s = alarm->hour / 10;
     }
+    else
+    {
+      alarm1.hour_10s = 0;
+    }
   }
 
   alarm1.day_of_week_or_month = alarm->day_type == DS3231_AlarmDayType_DayOfMonth;
@@ -603,11 +607,11 @@ static esp_err_t ds3231_set_alarm1(DS3231_Cfg_t cfg, DS3231_AlarmSetting_t* alar
 
 static esp_err_t ds3231_set_alarm2(DS3231_Cfg_t cfg, DS3231_AlarmSetting_t* alarm, TickType_t timeout)
 {
-  Internal_DS3231_Alarm1_t alarm2;
+  Internal_DS3231_Alarm2_t alarm2;
 
   alarm2.minutes_1s = alarm->minutes % 10;
   alarm2.minutes_10s = alarm->minutes / 10;
-  alarm2.a1m2 = (alarm->alarm_rate & 0b0010) == 0b0010;
+  alarm2.a2m2 = (alarm->alarm_rate & 0b001) == 0b001;
 
   alarm2.hour_1s = alarm->hour % 10;
   if (alarm->clock_type == DS3231_ClockType_12_Hour)
@@ -618,23 +622,27 @@ static esp_err_t ds3231_set_alarm2(DS3231_Cfg_t cfg, DS3231_AlarmSetting_t* alar
   else
   {
     alarm2.mode_12_24h = 0;
-    alarm2.a1m3 = (alarm->alarm_rate & 0b0100) == 0b0100;
-    if (alarm->hour > 19)
+    alarm2.a2m3 = (alarm->alarm_rate & 0b010) == 0b010;
+    if (alarm->hour > 19) // 20-23
     {
       alarm2.am_pm_hour_20 = 1;
       alarm2.hour_10s = 0;
     }
-    else if (alarm->hour > 9)
+    else if (alarm->hour > 9) //10-19
     {
       alarm2.am_pm_hour_20 = 0;
       alarm2.hour_10s = alarm->hour / 10;
     }
+    else // 1-9
+    {
+      alarm2.hour_10s = 0;
+    }
   }
 
-  alarm2.day_of_week_or_month = alarm->day_type == DS3231_AlarmDayType_DayOfMonth;
+  alarm2.day_of_week_or_month = alarm->day_type == DS3231_AlarmDayType_DayOfWeek;
   alarm2.day_1s = alarm->day % 10;
-  alarm2.day_1s = alarm->day / 10;
-  alarm2.a1m4 = (alarm->alarm_rate & 0b1000) == 0b1000;
+  alarm2.day_10s = alarm->day / 10;
+  alarm2.a2m4 = (alarm->alarm_rate & 0b100) == 0b100;
 
-  return ds3231_i2c_write(cfg, DS3231_ALM1_REG, (uint8_t*)&alarm2, sizeof(alarm2), timeout);
+  return ds3231_i2c_write(cfg, DS3231_ALM2_REG, (uint8_t*)&alarm2, sizeof(alarm2), timeout);
 }

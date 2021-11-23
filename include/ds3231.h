@@ -17,8 +17,8 @@ typedef struct DS3231_Cfg* DS3231_Cfg_t; //!< Configuration structure for DS3231
  */
 typedef enum __attribute__((__packed__))
 {
-  DS3231_ClockType_12_Hour, //!< 12 Hour Clock
-  DS3231_ClockType_24_Hour  //!< 24 Hour Clock
+  DS3231_ClockType_24_Hour, //!< 24 Hour Clock
+  DS3231_ClockType_12_Hour  //!< 12 Hour Clock
 } DS3231_ClockType_t;
 
 /**
@@ -53,8 +53,8 @@ typedef struct
  */
 typedef enum __attribute__((__packed__))
 {
-  DS3231_AlarmDayType_DayOfWeek,  //!< Day is day of week 1-7
-  DS3231_AlarmDayType_DayOfMonth  //!< Day is day of month 1-31
+  DS3231_AlarmDayType_DayOfMonth, //!< Day is day of month 1-31
+  DS3231_AlarmDayType_DayOfWeek   //!< Day is day of week 1-7
 } DS3231_AlarmDayType_t;
 
 /**
