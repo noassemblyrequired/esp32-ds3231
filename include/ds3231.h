@@ -116,11 +116,11 @@ typedef enum __attribute__((__packed__))
  */
 typedef enum __attribute__((__packed__))
 {
-  DS3231_SquareWave_1Hz       = 0x00, //!< Output 1Hz square wave
-  DS3231_SquareWave_1p024kHz  = 0x01, //!< Output 1.024kHz square wave
-  DS3231_SquareWave_4p096kHz  = 0x02, //!< Output 4.096kHz square wave
-  DS3231_SquareWave_8p192kHz  = 0x03, //!< Output 8.192kHz square wave
-  DS3231_SquareWave_Off       = 0xFF  //!< Disable square wave generation
+  DS3231_SquareWave_1Hz     = 0x00, //!< Output 1Hz square wave
+  DS3231_SquareWave_1024Hz  = 0x01, //!< Output 1024Hz square wave
+  DS3231_SquareWave_4096Hz  = 0x02, //!< Output 4096Hz square wave
+  DS3231_SquareWave_8192Hz  = 0x03, //!< Output 8192Hz square wave
+  DS3231_SquareWave_Off     = 0xFF  //!< Disable square wave generation
 } DS3231_SquareWave_t;
 
 /**
@@ -145,7 +145,7 @@ typedef enum __attribute__((__packed__))
  * @brief Construct configuration for DS3231. This does not initialize the i2c system. Use ds3231_delete to free the returned pointer.
  * 
  * @param i2c_port The i2c port to use, either I2C_NUM_0 or I2C_NUM_1
- * @return DS3231_Cfg_t 
+ * @return An initialised DS3231_Cfg_t or NULL if unable to allocate resource or DS3231 is not found.
  */
 DS3231_Cfg_t ds3231_create(i2c_port_t i2c_port);
 

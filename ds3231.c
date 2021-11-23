@@ -143,6 +143,19 @@ DS3231_Cfg_t ds3231_create(i2c_port_t i2c_port)
   if (cfg)
     cfg->i2c_port = i2c_port;
 
+  i2c_cmd_handle_t i2c_cmd_handle = i2c_cmd_link_create();
+  i2c_master_start(i2c_cmd_handle);
+  i2c_master_write_byte(i2c_cmd_handle, (DS3231_ADDR << 1) | I2C_MASTER_WRITE, true);
+  i2c_master_stop(i2c_cmd_handle);
+  esp_err_t res = i2c_master_cmd_begin(cfg->i2c_port, i2c_cmd_handle, pdMS_TO_TICKS(1));
+  i2c_cmd_link_delete(i2c_cmd_handle);
+
+  if (res != ESP_OK)
+  {
+    free(cfg);
+    cfg = NULL;
+  }
+
   return cfg;
 }
 
