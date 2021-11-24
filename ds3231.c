@@ -140,9 +140,10 @@ static inline esp_err_t ds3231_set_cs(DS3231_Cfg_t cfg, Internal_DS3231_CtrlStat
 DS3231_Cfg_t ds3231_create(i2c_port_t i2c_port)
 {
   DS3231_Cfg_t cfg = (DS3231_Cfg_t)malloc(sizeof(*cfg));
-  if (cfg)
-    cfg->i2c_port = i2c_port;
+  if (!cfg)
+    return NULL;
 
+  cfg->i2c_port = i2c_port;
   i2c_cmd_handle_t i2c_cmd_handle = i2c_cmd_link_create();
   i2c_master_start(i2c_cmd_handle);
   i2c_master_write_byte(i2c_cmd_handle, (DS3231_ADDR << 1) | I2C_MASTER_WRITE, true);
