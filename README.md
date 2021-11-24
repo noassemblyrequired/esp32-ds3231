@@ -62,7 +62,7 @@ There are two time-of-day alarms available in the DS3231. Alarm 1 supports confi
 
 ### Example with Interrupts
 ```c
-static void alarm_isr_top_half(void* arg)
+static void IRAM_ATTR alarm_isr_top_half(void* arg)
 {
   TaskHandle_t handle = (TaskHandle_t)arg;
   BaseType_t xHigherPriorityTaskWoken;
